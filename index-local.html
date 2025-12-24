@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D 蓝色粒子圣诞树（本地版）</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div class="controls">
+        <div class="control-group">
+            <label>粒子数量: <span id="particle-count">5000</span></label>
+            <input type="range" id="particle-slider" min="1000" max="10000" value="5000" step="500">
+        </div>
+        <div class="control-group">
+            <label>旋转速度: <span id="rotation-speed">1.0</span></label>
+            <input type="range" id="rotation-slider" min="0" max="3" value="1" step="0.1">
+        </div>
+        <div class="control-group">
+            <label>粒子大小: <span id="particle-size">2.0</span></label>
+            <input type="range" id="size-slider" min="0.5" max="5" value="2" step="0.1">
+        </div>
+        <button id="reset-btn">重置</button>
+    </div>
+    <div class="info">
+        <h1>3D 蓝色粒子圣诞树</h1>
+        <p>使用鼠标拖动旋转视角 | 滚轮缩放</p>
+    </div>
+    <div id="loading" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2000; text-align: center; color: #4a9eff;">
+        <h2>正在加载 3D 场景...</h2>
+        <p style="margin-top: 10px; color: #a0c4ff;">请稍候</p>
+    </div>
+    <div id="error" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2000; background: rgba(0,0,0,0.9); padding: 30px; border-radius: 15px; border: 2px solid #ff4444; max-width: 500px;">
+        <h2 style="color: #ff4444; margin-bottom: 15px;">加载错误</h2>
+        <p id="error-message" style="color: #fff; margin-bottom: 20px;"></p>
+        <p style="color: #a0c4ff; font-size: 14px; margin-bottom: 10px;">提示：</p>
+        <p style="color: #a0c4ff; font-size: 14px; line-height: 1.6;">
+            1. 请使用本地服务器运行（不能直接双击打开）<br>
+            2. 在项目目录运行：<code style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 3px;">npx serve</code><br>
+            3. 或使用 Python：<code style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 3px;">python -m http.server 8000</code>
+        </p>
+    </div>
+    <!-- 使用本地 Three.js（需要先运行 download-three.sh） -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "./lib/three/three.module.js",
+            "three/addons/": "./lib/three/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module" src="main.js"></script>
+    <script>
+        // 错误处理
+        window.addEventListener('error', function(e) {
+            console.error('错误:', e);
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const errorMsg = document.getElementById('error-message');
+            
+            if (loading) loading.style.display = 'none';
+            if (error) {
+                error.style.display = 'block';
+                if (errorMsg) {
+                    if (e.message && e.message.includes('lib/three')) {
+                        errorMsg.innerHTML = '本地 Three.js 文件未找到<br><br>' +
+                            '请先运行下载脚本：<br>' +
+                            '<code style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 3px;">./download-three.sh</code><br><br>' +
+                            '或使用在线版本：<code style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 3px;">index.html</code>';
+                    } else {
+                        errorMsg.textContent = e.message || '未知错误，请检查浏览器控制台';
+                    }
+                }
+            }
+        });
+        
+        // 检查是否支持模块
+        if (!HTMLScriptElement.supports || !HTMLScriptElement.supports('module')) {
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const errorMsg = document.getElementById('error-message');
+            
+            if (loading) loading.style.display = 'none';
+            if (error) {
+                error.style.display = 'block';
+                if (errorMsg) {
+                    errorMsg.textContent = '您的浏览器不支持 ES6 模块，请使用现代浏览器（Chrome、Firefox、Edge、Safari）';
+                }
+            }
+        }
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D 蓝色粒子圣诞树</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div class="controls">
+        <div class="control-group">
+            <label>粒子数量: <span id="particle-count">5000</span></label>
+            <input type="range" id="particle-slider" min="1000" max="10000" value="5000" step="500">
+        </div>
+        <div class="control-group">
+            <label>旋转速度: <span id="rotation-speed">1.0</span></label>
+            <input type="range" id="rotation-slider" min="0" max="3" value="1" step="0.1">
+        </div>
+        <div class="control-group">
+            <label>树粒子大小: <span id="particle-size">2.0</span></label>
+            <input type="range" id="size-slider" min="0.1" max="5" value="2" step="0.1">
+        </div>
+        <div class="control-group">
+            <label>地平面粒子大小: <span id="ground-size">0.8</span></label>
+            <input type="range" id="ground-size-slider" min="0.2" max="3" value="0.8" step="0.1">
+        </div>
+        <div class="control-group">
+            <label>雪花粒子大小: <span id="snow-size">1.2</span></label>
+            <input type="range" id="snow-size-slider" min="0.3" max="3" value="1.2" step="0.1">
+        </div>
+        <div class="control-group">
+            <label>五角星粒子大小: <span id="star-size">1.5</span></label>
+            <input type="range" id="star-size-slider" min="0.1" max="4" value="1.5" step="0.1">
+        </div>
+        <button id="reset-btn">重置</button>
+    </div>
+    <div class="info">
+        <h1>3D 蓝色粒子圣诞树</h1>
+        <p>使用鼠标拖动旋转视角 | 滚轮缩放</p>
+    </div>
+    <div id="loading" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2000; text-align: center; color: #4a9eff;">
+        <h2>正在加载 3D 场景...</h2>
+        <p style="margin-top: 10px; color: #a0c4ff;">请稍候</p>
+    </div>
+    <div id="error" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2000; background: rgba(0,0,0,0.9); padding: 30px; border-radius: 15px; border: 2px solid #ff4444; max-width: 500px;">
+        <h2 style="color: #ff4444; margin-bottom: 15px;">加载错误</h2>
+        <p id="error-message" style="color: #fff; margin-bottom: 20px;"></p>
+        <p style="color: #a0c4ff; font-size: 14px; margin-bottom: 10px;">提示：</p>
+        <p style="color: #a0c4ff; font-size: 14px; line-height: 1.6;">
+            1. 请使用本地服务器运行（不能直接双击打开）<br>
+            2. 在项目目录运行：<code style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 3px;">npx serve</code><br>
+            3. 或使用 Python：<code style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 3px;">python -m http.server 8000</code>
+        </p>
+    </div>
+    <!-- 使用 unpkg CDN，通常更可靠 -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module" src="main.js"></script>
+    <script>
+        let loadTimeout;
+        let retryCount = 0;
+        const maxRetries = 3;
+        
+        // CDN 备用列表
+        const CDN_SOURCES = [
+            {
+                three: 'https://unpkg.com/three@0.160.0/build/three.module.js',
+                addons: 'https://unpkg.com/three@0.160.0/examples/jsm/'
+            },
+            {
+                three: 'https://cdn.skypack.dev/three@0.160.0',
+                addons: 'https://cdn.skypack.dev/three@0.160.0/examples/jsm/'
+            },
+            {
+                three: 'https://esm.sh/three@0.160.0',
+                addons: 'https://esm.sh/three@0.160.0/examples/jsm/'
+            }
+        ];
+        
+        // 设置加载超时
+        loadTimeout = setTimeout(() => {
+            if (retryCount < maxRetries) {
+                retryCount++;
+                console.log(`尝试备用 CDN ${retryCount}...`);
+                retryLoad();
+            } else {
+                showError('加载超时，无法连接到 CDN 服务器');
+            }
+        }, 8000);
+        
+        function retryLoad() {
+            if (retryCount >= CDN_SOURCES.length) return;
+            
+            const cdn = CDN_SOURCES[retryCount];
+            const importMap = document.querySelector('script[type="importmap"]');
+            
+            if (importMap) {
+                importMap.textContent = JSON.stringify({
+                    imports: {
+                        'three': cdn.three,
+                        'three/addons/': cdn.addons
+                    }
+                });
+                
+                // 重新加载页面以应用新的 importmap
+                console.log('重新加载页面以使用备用 CDN...');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 500);
+            }
+        }
+        
+        function showError(message) {
+            clearTimeout(loadTimeout);
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const errorMsg = document.getElementById('error-message');
+            
+            if (loading) loading.style.display = 'none';
+            if (error) {
+                error.style.display = 'block';
+                if (errorMsg) {
+                    errorMsg.innerHTML = message + '<br><br>' +
+                        '<strong>解决方案：</strong><br>' +
+                        '1. 检查网络连接<br>' +
+                        '2. 尝试刷新页面（F5）<br>' +
+                        '3. 如果使用 VPN，请确保 VPN 正常工作<br>' +
+                        '4. 检查防火墙设置<br>' +
+                        '5. 尝试使用其他浏览器';
+                }
+            }
+        }
+        
+        // 成功加载后清除超时
+        window.addEventListener('load', () => {
+            clearTimeout(loadTimeout);
+            setTimeout(() => {
+                const loading = document.getElementById('loading');
+                if (loading && loading.style.display !== 'none') {
+                    // 如果 3 秒后还在显示加载，可能有问题
+                    const checkInterval = setInterval(() => {
+                        if (document.querySelector('canvas')) {
+                            clearInterval(checkInterval);
+                            if (loading) loading.style.display = 'none';
+                        }
+                    }, 100);
+                }
+            }, 3000);
+        });
+        
+        // 错误处理
+        window.addEventListener('error', function(e) {
+            if (e.message && (e.message.includes('three') || e.message.includes('Failed to fetch') || e.message.includes('ERR_CONNECTION'))) {
+                console.error('Three.js 加载错误:', e);
+                if (retryCount < maxRetries) {
+                    retryLoad();
+                } else {
+                    showError('无法加载 Three.js 库：' + e.message);
+                }
+            }
+        });
+        
+        // 检查是否支持模块
+        if (!HTMLScriptElement.supports || !HTMLScriptElement.supports('module')) {
+            showError('您的浏览器不支持 ES6 模块，请使用现代浏览器（Chrome、Firefox、Edge、Safari）');
+        }
+    </script>
+</body>
+</html>
+

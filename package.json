@@ -1,0 +1,23 @@
+{
+  "name": "3d-particle-christmas-tree",
+  "version": "1.0.0",
+  "description": "一个使用 Three.js 构建的高级 3D 蓝色粒子圣诞树",
+  "main": "main.js",
+  "scripts": {
+    "start": "npx serve .",
+    "dev": "npx serve ."
+  },
+  "keywords": [
+    "three.js",
+    "3d",
+    "particles",
+    "christmas-tree",
+    "webgl",
+    "shader"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {}
+}
+
