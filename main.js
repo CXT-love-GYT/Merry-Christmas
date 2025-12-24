@@ -842,23 +842,22 @@ class ParticleChristmasTree {
             imageGroup.position.set(x, ringHeight, z);
             
             // 让图片朝外显示，并往内倾斜15度
-            // 计算朝向：图片应该面向外部（远离中心）
-            // 使用相对于图片环的本地旋转，确保图片环旋转时图片朝向不变
-            // 计算从中心指向图片的方向角度
-            const targetY = Math.atan2(x, z); // 计算朝向角度（朝外）
+            // 计算朝向：图片应该面向外部（远离中心，不朝向圣诞树）
+            // 图片在图片环中的位置是 (x, z)，要朝外，需要面向从中心指向图片的方向
+            // 由于mesh已经翻转了180度（rotation.x = Math.PI），图片正面现在朝向-Z方向
+            // 所以要朝外，需要让图片面向从中心指向图片的方向
+            // 计算Y轴旋转角度：让图片正面朝外
+            const targetY = Math.atan2(x, z) + Math.PI; // 加PI让图片正面朝外（因为mesh已翻转）
             
-            // 设置旋转：Y轴旋转让图片朝外，相对于图片环的本地坐标系
+            // 设置旋转：Y轴旋转让图片朝外
             imageGroup.rotation.y = targetY; // 朝外
             imageGroup.rotation.x = 0; // 不上下倾斜
             
             // 往内倾斜15度（绕Z轴旋转，相对于图片环）
+            // 注意：向内倾斜意味着朝向中心方向倾斜
             const tiltAngleDegrees = 15; // 15度
             const tiltAngle = (tiltAngleDegrees * Math.PI) / 180; // 转换为弧度
-            imageGroup.rotation.z = tiltAngle; // 往内倾斜
-            
-            // 存储初始角度，用于后续检查
-            imageData.initialAngle = angle;
-            imageData.initialRotationY = targetY;
+            imageGroup.rotation.z = tiltAngle; // 往内倾斜（朝向中心）
             
             // 添加边框
             const borderGeometry = new THREE.PlaneGeometry(imageWidth + 0.2, imageHeight + 0.2);
@@ -884,7 +883,10 @@ class ParticleChristmasTree {
                 originalScale: new THREE.Vector3(1, 1, 1),
                 originalLocalRotation: imageGroup.rotation.clone(),
                 isEnlarged: false,
-                texture: texture
+                texture: texture,
+                initialAngle: angle,
+                initialRotationY: targetY,
+                initialRotationZ: tiltAngle
             };
             
             this.imageMeshes.push(imageData);
@@ -1276,6 +1278,10 @@ class ParticleChristmasTree {
         if (this.imageRing) {
             // 整个图片环匀速旋转（公转）
             this.imageRing.rotation.y += 0.001; // 匀速旋转速度
+            
+            // 确保所有图片保持正确的朝向（朝外，不朝向中心）
+            // 图片的旋转是相对于图片环的本地坐标系，所以不需要更新
+            // 但如果发现图片朝向不对，可以在这里修复
         }
         
         // 更新控制器
@@ -1319,11 +1325,13 @@ window.addEventListener('DOMContentLoaded', () => {
             errorDiv.style.display = 'block';
             if (errorMsg) {
                 errorMsg.innerHTML = '初始化失败：' + (error.message || '未知错误') + '<br><br>' +
+                    '错误详情：' + (error.stack || '无堆栈信息') + '<br><br>' +
                     '请按 F12 打开浏览器控制台查看详细错误信息<br>' +
                     '常见问题：<br>' +
                     '1. 确保使用现代浏览器（Chrome、Firefox、Edge、Safari）<br>' +
                     '2. 确保网络连接正常（需要加载 Three.js）<br>' +
-                    '3. 确保使用服务器运行（不能直接打开文件）';
+                    '3. 确保使用服务器运行（不能直接打开文件）<br>' +
+                    '4. 检查浏览器控制台的错误信息';
             }
         }
     }
