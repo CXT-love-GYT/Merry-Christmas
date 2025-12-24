@@ -10,7 +10,9 @@ class ParticleChristmasTree {
         this.particleSystem = null;
         this.groundParticles = null;
         this.snowParticles = null;
+        this.randomSnowParticles = null; // 额外的随机雪花粒子
         this.starParticles = null;
+        this.textParticles = null; // 文字粒子
         this.imageRing = null;
         this.imageMeshes = []; // 存储所有图片mesh
         this.enlargedImage = null; // 当前放大的图片
@@ -21,18 +23,19 @@ class ParticleChristmasTree {
         
         // 参数
         this.params = {
-            particleCount: 5000,
-            rotationSpeed: 1.0,
-            particleSize: 2.0,
+            particleCount: 8000,
+            rotationSpeed: 0.8,
+            particleSize: 1.0,
             treeHeight: 15,
             treeWidth: 8,
             layers: 8,
-            groundParticleCount: 16000, // 翻倍：从8000增加到16000
-            snowParticleCount: 4000, // 增加：从2000增加到4000，保持一定数量
-            starParticleCount: 500,
-            groundParticleSize: 0.8,
-            snowParticleSize: 1.2,
-            starParticleSize: 1.5
+            groundParticleCount: 24000, // 增加：从16000增加到24000，增加随机粒子
+            snowParticleCount: 4000, // 螺旋纹路的雪花粒子
+            randomSnowParticleCount: 3000, // 额外的随机雪花粒子
+            starParticleCount: 800, // 增加粒子数量，让3D效果更明显
+            groundParticleSize: 0.7,
+            snowParticleSize: 1.0,
+            starParticleSize: 0.6
         };
         
         this.init();
@@ -106,11 +109,17 @@ class ParticleChristmasTree {
         // 创建白色粒子地平面
         this.createGroundParticles();
         
-        // 创建飘散的白色粒子（雪花）
+        // 创建飘散的白色粒子（雪花）- 螺旋纹路
         this.createSnowParticles();
+        
+        // 创建额外的随机雪花粒子
+        this.createRandomSnowParticles();
         
         // 创建树顶五角星
         this.createStar();
+        
+        // 创建红色粒子文字 "Merry Christmas"
+        this.createTextParticles();
         
         // 创建图片展示环
         this.createImageRing();
@@ -325,7 +334,7 @@ class ParticleChristmasTree {
         // 创建密集的白色粒子地平面
         const groundSize = 50; // 扩大范围
         const groundY = 0;
-        const spiralRatio = 0.9; // 90%的粒子使用螺旋分布，10%随机分布
+        const spiralRatio = 0.7; // 70%的粒子使用螺旋分布，30%随机分布
         
         // 螺旋线参数
         const maxRadius = groundSize * 0.5; // 最大半径
@@ -578,6 +587,134 @@ class ParticleChristmasTree {
         this.scene.add(this.snowParticles);
     }
     
+    createRandomSnowParticles() {
+        const geometry = new THREE.BufferGeometry();
+        const positions = [];
+        const colors = [];
+        const sizes = [];
+        const velocities = [];
+        const rotations = [];
+        
+        // 创建完全随机的白色粒子（雪花）
+        const areaSize = 50; // 更大的区域
+        const heightRange = 35; // 更高的范围
+        
+        for (let i = 0; i < this.params.randomSnowParticleCount; i++) {
+            // 在空间中完全随机分布
+            const x = (Math.random() - 0.5) * areaSize;
+            const y = Math.random() * heightRange;
+            const z = (Math.random() - 0.5) * areaSize;
+            
+            positions.push(x, y, z);
+            
+            // 纯白色，稍微透明一些
+            const white = 0.7 + Math.random() * 0.3;
+            colors.push(white, white, white);
+            
+            // 粒子大小（使用参数控制，稍微小一点）
+            const size = this.params.snowParticleSize * (0.5 + Math.random() * 0.5);
+            sizes.push(size);
+            
+            // 随机飘散速度
+            velocities.push(
+                (Math.random() - 0.5) * 0.08,
+                -Math.random() * 0.15 - 0.08, // 向下飘落
+                (Math.random() - 0.5) * 0.08
+            );
+            
+            // 旋转速度
+            rotations.push(Math.random() * Math.PI * 2);
+        }
+        
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geometry.setAttribute('particleColor', new THREE.Float32BufferAttribute(colors, 3));
+        geometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
+        geometry.setAttribute('velocity', new THREE.Float32BufferAttribute(velocities, 3));
+        geometry.setAttribute('rotation', new THREE.Float32BufferAttribute(rotations, 1));
+        
+        const material = new THREE.ShaderMaterial({
+            uniforms: {
+                time: { value: 0 },
+                pointSize: { value: this.params.snowParticleSize }
+            },
+            vertexShader: `
+                attribute float size;
+                attribute vec3 particleColor;
+                attribute vec3 velocity;
+                attribute float rotation;
+                uniform float time;
+                uniform float pointSize;
+                
+                varying vec3 vColor;
+                varying float vAlpha;
+                varying float vRotation;
+                
+                void main() {
+                    vColor = particleColor;
+                    vRotation = rotation + time * 2.5;
+                    
+                    // 飘散动画
+                    vec3 pos = position;
+                    float moveTime = mod(time * 12.0, 120.0);
+                    pos.x += velocity.x * moveTime;
+                    pos.y += velocity.y * moveTime;
+                    pos.z += velocity.z * moveTime;
+                    
+                    // 循环：使用 mod 实现循环
+                    pos.y = mod(pos.y + 40.0, 40.0);
+                    pos.x = mod(pos.x + 25.0, 50.0) - 25.0;
+                    pos.z = mod(pos.z + 25.0, 50.0) - 25.0;
+                    
+                    // 随机旋转效果（围绕中心）
+                    float rot = time * 0.25;
+                    float c = cos(rot);
+                    float s = sin(rot);
+                    float newX = pos.x * c - pos.z * s;
+                    float newZ = pos.x * s + pos.z * c;
+                    pos.x = newX;
+                    pos.z = newZ;
+                    
+                    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                    float distance = length(mvPosition.xyz);
+                    float alpha = 1.0 - smoothstep(0.0, 60.0, distance);
+                    vAlpha = alpha * 0.6; // 更透明一些
+                    
+                    gl_PointSize = size * pointSize * (300.0 / distance);
+                    gl_Position = projectionMatrix * mvPosition;
+                }
+            `,
+            fragmentShader: `
+                varying vec3 vColor;
+                varying float vAlpha;
+                varying float vRotation;
+                
+                void main() {
+                    vec2 coord = gl_PointCoord - vec2(0.5);
+                    // 旋转
+                    float c = cos(vRotation);
+                    float s = sin(vRotation);
+                    coord = vec2(coord.x * c - coord.y * s, coord.x * s + coord.y * c);
+                    coord += vec2(0.5);
+                    
+                    float distance = length(coord - vec2(0.5));
+                    if (distance > 0.5) discard;
+                    
+                    float alpha = (1.0 - distance * 2.0) * vAlpha;
+                    alpha = pow(alpha, 0.6);
+                    
+                    vec3 glow = vColor * (1.0 + (1.0 - distance * 2.0) * 1.0);
+                    gl_FragColor = vec4(glow, alpha);
+                }
+            `,
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+        
+        this.randomSnowParticles = new THREE.Points(geometry, material);
+        this.scene.add(this.randomSnowParticles);
+    }
+    
     createStar() {
         const geometry = new THREE.BufferGeometry();
         const positions = [];
@@ -588,7 +725,7 @@ class ParticleChristmasTree {
         // 创建3D五角星（垂直立着）
         const starHeight = this.params.treeHeight + 2.0; // 树顶上方，悬浮
         const starRadius = 1.5; // 五角星半径
-        const starThickness = 0.3; // 五角星厚度
+        const starThickness = 0.8; // 五角星厚度（加宽，让3D效果更明显）
         
         // 五角星的5个外顶点和5个内顶点（在YZ平面，垂直立着）
         const outerPoints = [];
@@ -660,12 +797,15 @@ class ParticleChristmasTree {
             // 垂直立着的五角星，Y坐标加上高度，X和Z保持原样
             positions.push(x, starHeight + y, z);
             
-            // 蓝色粒子，从深蓝到亮蓝
-            const colorMix = new THREE.Color().lerpColors(
-                new THREE.Color(0x0066ff),
-                new THREE.Color(0x4a9eff),
-                Math.random()
-            );
+            // 金黄色粒子，从深金到亮金
+            const goldColor1 = new THREE.Color(0xFFD700); // 金色
+            const goldColor2 = new THREE.Color(0xFFA500); // 橙金色
+            const goldColor3 = new THREE.Color(0xFFC125); // 金丝雀黄
+            const colorMix = new THREE.Color().lerpColors(goldColor2, goldColor1, Math.random());
+            // 添加一些变化，让颜色更丰富
+            if (Math.random() > 0.7) {
+                colorMix.lerp(goldColor3, 0.3);
+            }
             colors.push(colorMix.r, colorMix.g, colorMix.b);
             
             // 粒子大小
@@ -747,29 +887,185 @@ class ParticleChristmasTree {
         this.scene.add(this.starParticles);
     }
     
+    createTextParticles() {
+        // 使用Canvas渲染文字，然后提取粒子位置
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const text1 = 'Merry';
+        const text2 = 'Christmas';
+        
+        // 设置Canvas大小（调整为更小，适合两行文字）
+        canvas.width = 1024;
+        canvas.height = 512;
+        
+        // 设置文字样式（红色，使用优雅字体）
+        ctx.fillStyle = '#ffffff';
+        // 使用优雅的字体：Georgia（衬线字体，优雅）作为首选，备选 Times New Roman 和 serif
+        ctx.font = 'bold 120px Georgia, "Times New Roman", serif';
+        ctx.textAlign = 'center'; // 居中对齐
+        ctx.textBaseline = 'middle';
+        
+        // 绘制两行文字（居中）
+        const lineHeight = 150;
+        ctx.fillText(text1, canvas.width / 2, canvas.height / 2 - lineHeight / 2);
+        ctx.fillText(text2, canvas.width / 2, canvas.height / 2 + lineHeight / 2);
+        
+        // 读取像素数据
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        
+        // 提取粒子位置
+        const positions = [];
+        const colors = [];
+        const sizes = [];
+        const rotations = [];
+        
+        const scale = 0.015; // 缩放因子，控制文字大小（更小）
+        const spacing = 4; // 采样间隔，控制粒子密度（稍微稀疏一点）
+        
+        // 文字位置：在树的左侧，更高一些
+        const textX = -this.params.treeWidth * 1.1; // 在树左侧，更左一些
+        const textHeight = this.params.treeHeight * 0.8; // 在树更高位置
+        const textWidth = canvas.width * scale;
+        const textDepth = 0.3; // 文字厚度（更薄）
+        
+        for (let y = 0; y < canvas.height; y += spacing) {
+            for (let x = 0; x < canvas.width; x += spacing) {
+                const index = (y * canvas.width + x) * 4;
+                const alpha = data[index + 3];
+                
+                // 只提取不透明的像素
+                if (alpha > 128) {
+                    // 计算3D位置（左侧，两行，居中）
+                    const px = textX + (x - canvas.width / 2) * scale; // 居中计算
+                    const py = textHeight - (y - canvas.height / 2) * scale;
+                    const pz = (Math.random() - 0.5) * textDepth; // 添加深度变化
+                    
+                    positions.push(px, py, pz);
+                    
+                    // 红色粒子，从深红到亮红
+                    const redColor1 = new THREE.Color(0xFF0000); // 纯红
+                    const redColor2 = new THREE.Color(0xFF4444); // 亮红
+                    const redColor3 = new THREE.Color(0xCC0000); // 深红
+                    const redColor4 = new THREE.Color(0xFF6666); // 浅红
+                    const colorMix = new THREE.Color().lerpColors(redColor3, redColor1, Math.random());
+                    if (Math.random() > 0.6) {
+                        colorMix.lerp(redColor2, 0.4);
+                    } else if (Math.random() > 0.8) {
+                        colorMix.lerp(redColor4, 0.3);
+                    }
+                    colors.push(colorMix.r, colorMix.g, colorMix.b);
+                    
+                    // 粒子大小（更小）
+                    const size = 0.8 * (0.8 + Math.random() * 0.4);
+                    sizes.push(size);
+                    
+                    // 旋转角度
+                    rotations.push(Math.random() * Math.PI * 2);
+                }
+            }
+        }
+        
+        if (positions.length === 0) {
+            console.warn('无法生成文字粒子，Canvas文字渲染可能失败');
+            return;
+        }
+        
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geometry.setAttribute('particleColor', new THREE.Float32BufferAttribute(colors, 3));
+        geometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
+        geometry.setAttribute('rotation', new THREE.Float32BufferAttribute(rotations, 1));
+        
+        const material = new THREE.ShaderMaterial({
+            uniforms: {
+                time: { value: 0 },
+                pointSize: { value: 0.8 }
+            },
+            vertexShader: `
+                attribute float size;
+                attribute vec3 particleColor;
+                attribute float rotation;
+                uniform float time;
+                uniform float pointSize;
+                
+                varying vec3 vColor;
+                varying float vAlpha;
+                varying float vRotation;
+                
+                void main() {
+                    vColor = particleColor;
+                    vRotation = rotation + time * 1.0;
+                    
+                    vec3 pos = position;
+                    // 轻微的浮动效果
+                    pos.y += sin(time * 2.0 + position.x * 0.1) * 0.1;
+                    pos.x += cos(time * 1.5 + position.z * 0.1) * 0.05;
+                    
+                    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                    float distance = length(mvPosition.xyz);
+                    float alpha = 1.0 - smoothstep(0.0, 80.0, distance);
+                    vAlpha = alpha * 0.9;
+                    
+                    gl_PointSize = size * pointSize * (300.0 / distance);
+                    gl_Position = projectionMatrix * mvPosition;
+                }
+            `,
+            fragmentShader: `
+                varying vec3 vColor;
+                varying float vAlpha;
+                varying float vRotation;
+                
+                void main() {
+                    vec2 coord = gl_PointCoord - vec2(0.5);
+                    // 旋转
+                    float c = cos(vRotation);
+                    float s = sin(vRotation);
+                    coord = vec2(coord.x * c - coord.y * s, coord.x * s + coord.y * c);
+                    coord += vec2(0.5);
+                    
+                    float distance = length(coord - vec2(0.5));
+                    if (distance > 0.5) discard;
+                    
+                    float alpha = (1.0 - distance * 2.0) * vAlpha;
+                    alpha = pow(alpha, 0.5);
+                    
+                    vec3 glow = vColor * (1.0 + (1.0 - distance * 2.0) * 2.0);
+                    gl_FragColor = vec4(glow, alpha);
+                }
+            `,
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+        
+        this.textParticles = new THREE.Points(geometry, material);
+        this.scene.add(this.textParticles);
+    }
+    
     createImageRing() {
         // 图片文件列表 - 使用新的文件名，支持最多20张
         const imageFiles = [
-            'image/微信图片_20251224211232_59_185.jpg',
-            'image/微信图片_20251224211233_60_185.jpg',
-            'image/微信图片_20251224211234_61_185.jpg',
-            'image/微信图片_20251224211235_62_185.jpg',
-            'image/微信图片_20251224211236_63_185.jpg',
-            'image/微信图片_20251224211236_64_185.jpg',
-            'image/微信图片_20251224211237_65_185.jpg',
-            'image/微信图片_20251224211238_66_185.jpg',
-            'image/微信图片_20251224211239_67_185.jpg',
-            'image/微信图片_20251224211240_68_185.jpg',
-            'image/微信图片_20251224211240_69_185.jpg',
-            'image/微信图片_20251224211241_70_185.jpg',
-            'image/微信图片_20251224211242_71_185.jpg',
-            'image/微信图片_20251224211243_72_185.jpg',
-            'image/微信图片_20251224211244_73_185.jpg',
-            'image/微信图片_20251224211244_74_185.jpg',
-            'image/微信图片_20251224211245_75_185.jpg',
-            'image/微信图片_20251224211246_76_185.jpg',
-            'image/微信图片_20251224211247_77_185.jpg',
-            'image/微信图片_20251224211248_78_185.jpg'
+            'image/微信图片_20251224220700_79_185.jpg',
+            'image/微信图片_20251224220703_80_185.jpg',
+            'image/微信图片_20251224220708_81_185.jpg',
+            'image/微信图片_20251224220710_82_185.jpg',
+            'image/微信图片_20251224220712_83_185.jpg',
+            'image/微信图片_20251224220713_84_185.jpg',
+            'image/微信图片_20251224220715_85_185.jpg',
+            'image/微信图片_20251224220715_86_185.jpg',
+            'image/微信图片_20251224220717_87_185.jpg',
+            'image/微信图片_20251224220719_88_185.jpg',
+            'image/微信图片_20251224220720_89_185.jpg',
+            'image/微信图片_20251224220722_90_185.jpg',
+            'image/微信图片_20251224220723_91_185.jpg',
+            'image/微信图片_20251224220724_92_185.jpg',
+            'image/微信图片_20251224220726_93_185.jpg',
+            'image/微信图片_20251224220727_94_185.jpg',
+            'image/微信图片_20251224220731_95_185.jpg',
+            'image/微信图片_20251224220732_96_185.jpg',
+            'image/微信图片_20251224220733_97_185.jpg',
+            'image/微信图片_20251224220735_98_185.jpg'
         ];
         
         // 限制最多20张
@@ -1191,39 +1487,39 @@ class ParticleChristmasTree {
         const resetBtn = document.getElementById('reset-btn');
         if (resetBtn) {
             resetBtn.addEventListener('click', () => {
-                this.params.particleCount = 5000;
-                this.params.rotationSpeed = 1.0;
-                this.params.particleSize = 2.0;
-                this.params.groundParticleSize = 0.8;
-                this.params.snowParticleSize = 1.2;
-                this.params.starParticleSize = 1.5;
+                this.params.particleCount = 8000;
+                this.params.rotationSpeed = 0.8;
+                this.params.particleSize = 1.0;
+                this.params.groundParticleSize = 0.7;
+                this.params.snowParticleSize = 1.0;
+                this.params.starParticleSize = 0.6;
                 
-                if (particleSlider) particleSlider.value = 5000;
-                if (rotationSlider) rotationSlider.value = 1.0;
-                if (sizeSlider) sizeSlider.value = 2.0;
-                if (groundSizeSlider) groundSizeSlider.value = 0.8;
-                if (snowSizeSlider) snowSizeSlider.value = 1.2;
-                if (starSizeSlider) starSizeSlider.value = 1.5;
+                if (particleSlider) particleSlider.value = 8000;
+                if (rotationSlider) rotationSlider.value = 0.8;
+                if (sizeSlider) sizeSlider.value = 1.0;
+                if (groundSizeSlider) groundSizeSlider.value = 0.7;
+                if (snowSizeSlider) snowSizeSlider.value = 1.0;
+                if (starSizeSlider) starSizeSlider.value = 0.6;
                 
-                if (particleCount) particleCount.textContent = '5000';
-                if (rotationSpeed) rotationSpeed.textContent = '1.0';
-                if (particleSize) particleSize.textContent = '2.0';
-                if (groundSize) groundSize.textContent = '0.8';
-                if (snowSize) snowSize.textContent = '1.2';
-                if (starSize) starSize.textContent = '1.5';
+                if (particleCount) particleCount.textContent = '8000';
+                if (rotationSpeed) rotationSpeed.textContent = '0.8';
+                if (particleSize) particleSize.textContent = '1.0';
+                if (groundSize) groundSize.textContent = '0.7';
+                if (snowSize) snowSize.textContent = '1.0';
+                if (starSize) starSize.textContent = '0.6';
                 
                 this.recreateParticles();
                 if (this.particleSystem) {
-                    this.particleSystem.material.uniforms.pointSize.value = 2.0;
+                    this.particleSystem.material.uniforms.pointSize.value = 1.0;
                 }
                 if (this.groundParticles) {
-                    this.groundParticles.material.uniforms.pointSize.value = 0.8;
+                    this.groundParticles.material.uniforms.pointSize.value = 0.7;
                 }
                 if (this.snowParticles) {
-                    this.snowParticles.material.uniforms.pointSize.value = 1.2;
+                    this.snowParticles.material.uniforms.pointSize.value = 1.0;
                 }
                 if (this.starParticles) {
-                    this.starParticles.material.uniforms.pointSize.value = 1.5;
+                    this.starParticles.material.uniforms.pointSize.value = 0.6;
                 }
             });
         }
@@ -1260,11 +1556,18 @@ class ParticleChristmasTree {
             this.groundParticles.material.uniforms.time.value = time;
         }
         
-        // 更新飘散的白色粒子（雪花）
+        // 更新飘散的白色粒子（雪花）- 螺旋纹路
         if (this.snowParticles) {
             this.snowParticles.material.uniforms.time.value = time;
             // 雪花整体旋转
             this.snowParticles.rotation.y += 0.0002;
+        }
+        
+        // 更新额外的随机雪花粒子
+        if (this.randomSnowParticles) {
+            this.randomSnowParticles.material.uniforms.time.value = time;
+            // 随机雪花整体旋转（稍微快一点）
+            this.randomSnowParticles.rotation.y += 0.0003;
         }
         
         // 更新五角星粒子
@@ -1272,6 +1575,12 @@ class ParticleChristmasTree {
             this.starParticles.material.uniforms.time.value = time;
             // 五角星缓慢旋转
             this.starParticles.rotation.y += 0.0005;
+        }
+        
+        // 更新文字粒子
+        if (this.textParticles) {
+            this.textParticles.material.uniforms.time.value = time;
+            // 文字可以轻微旋转或保持静止
         }
         
         // 更新图片展示环（匀速公转，不自转）
